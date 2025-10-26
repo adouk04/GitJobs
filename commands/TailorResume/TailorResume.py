@@ -1,6 +1,8 @@
 from discord import app_commands, Interaction, Attachment
 import pdfplumber, re, io
-
+from ParseData import ParseData
+import discord
+import resumeFormats
 # lingo
 # ephemeral - indicates to only the user that runs the command
 
@@ -14,8 +16,9 @@ class TailorResume:
     def _register(self):
         @self.tree.command(name="tailor_resume", description="tailors resume for user")
         # another parameter for job description (copy & paste text in)
-        async def tailor_resume(interaction: Interaction, file:Attachment):
-
+        
+        async def tailor_resume(interaction: Interaction, file:Attachment, job_description: str):
+            
             if not file.filename.lower().endswith(".pdf"):
                 await interaction.response.send_message(
                     "Please upload a valid `.pdf` file.",
@@ -58,9 +61,37 @@ class TailorResume:
                 ephemeral=True
             )            
 
-            # calls parseData?
-            processed_data = text
+            resume = text
             #parse data
+            prompt = f"""
+                You are an expert resume writer. Tailor the following resume 
+                to match the job description below.
+
+                ### JOB DESCRIPTION:
+                {job_description}
+
+                ### ORIGINAL RESUME:
+                {resume}
+                Rewrite the resume to:
+                - Emphasize skills and experience relevant to the job description.
+                - Keep the structure clean and professional.
+                - Preserve factual accuracy.
+                - Use concise, action-oriented bullet points.
+                - Keep it around one page if possible.
+
+                Return using this resume format only when compliing back a resume:
+                {resumeFormats.alex_format}
+                """
+            
+            try:
+                processed_resume_path = ParseData.parseResume(text, prompt)
+                await interaction.followup.send(
+                    content="Here’s your tailored resume!",
+                    file=discord.File(processed_resume_path),
+                    ephemeral=True
+                )
+            except Exception as e:
+                await interaction.followup.send(f"Error generating tailored resume: {e}", ephemeral=True)
 
 
         def extract_text_pdf(pdf_bytes: bytes) -> str:

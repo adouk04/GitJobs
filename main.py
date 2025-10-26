@@ -29,7 +29,7 @@ async def on_ready():
     
     TailorResume(tree)  # Initialize the TailorResume command
     try:
-        await tree.sync() # defines slash commands in discord, discord registers on their side
+        await tree.sync(guild=discord.Object(id=int(DISCORD_CHANNEL_TOKEN))) # defines slash commands in discord, discord registers on their side
     except Exception as e:
         print(f"sync failed: {e}")
 
