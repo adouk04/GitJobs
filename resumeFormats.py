@@ -1,5 +1,4 @@
-alex_format = {
-    """
+alex_format = r"""
 %-------------------------
 % Resume in LaTeX (Jinja2 template)
 %-------------------------
@@ -161,5 +160,4 @@ alex_format = {
 
 \end{document}
 
-    """
-}
+"""
