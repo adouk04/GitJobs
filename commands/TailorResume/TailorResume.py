@@ -1,6 +1,6 @@
 from discord import app_commands, Interaction, Attachment
 import pdfplumber, re, io
-from ParseData import ParseData
+from parseData import ParseData
 import discord
 import resumeFormats
 import asyncio
@@ -19,7 +19,7 @@ class TailorResume:
         @self.tree.command(name="tailor_resume", description="tailors resume for user")
         
         async def tailor_resume(interaction: Interaction, file:Attachment, job_description: str):
-            
+
             if not file.filename.lower().endswith(".pdf"):
                 await interaction.response.send_message(
                     "Please upload a valid `.pdf` file.",
@@ -35,7 +35,8 @@ class TailorResume:
                     ephemeral=True
                 )
                 return
-            await interaction.response.send_message(f"Received {file.filename}")#, ephemeral=True)
+
+            await interaction.response.send_message(f"Received {file.filename}", ephemeral=True)
             
             try:
                 pdf_bytes = await file.read()
@@ -95,14 +96,14 @@ class TailorResume:
                 processed_resume_path = await asyncio.to_thread(ParseData.parseResume, text, prompt)
 
                 await interaction.followup.send(
-                    content="✅ Here’s your tailored resume!",
+                    content="Here’s your tailored resume!",
                     file=discord.File(processed_resume_path),
-                    # ephemeral=True
+                    ephemeral=True
                 )
             except Exception as e:
                 await interaction.followup.send(
                     f"Error generating tailored resume: {e}",
-                    # ephemeral=True
+                    ephemeral=True
                 )            
 
 
