@@ -115,6 +115,8 @@ class ParseData:
             tex_file = os.path.join(temp_dir, "resume.tex")
             with open(tex_file, "w", encoding="utf-8") as f:
                 f.write(latex_content)
+            
+            LATEX_TIMEOUT = int(os.getenv("LATEX_TIMEOUT_SEC", "300"))  # per-run timeout (sec)
 
             try:
                 # Run pdflatex 2–3 times; include safe flags and a timeout
@@ -131,7 +133,7 @@ class ParseData:
                         cwd=temp_dir,
                         capture_output=True,
                         text=True,
-                        timeout=60  # prevent hanging
+                        timeout=LATEX_TIMEOUT  # prevent hanging
                     )
                     if result.returncode != 0:
                         # Surface the most useful error lines
@@ -140,14 +142,15 @@ class ParseData:
                         if os.path.exists(log_path):
                             with open(log_path, "r", encoding="utf-8", errors="ignore") as lf:
                                 lines = lf.readlines()
-                            bang_lines = [ln for ln in lines if ln.lstrip().startswith("!")]
-                            excerpt = "".join(bang_lines[:10])
+                            bang = [ln for ln in lines if ln.lstrip().startswith("!")]
+                            excerpt = "".join(bang[:20]) or "".join(lines[-80:])  # fallback: last lines
                         raise Exception(
                             "LaTeX compilation failed.\n"
                             f"stderr:\n{result.stderr}\n\n"
                             f"log (first errors):\n{excerpt or '(no error lines found)'}"
                         )
 
+                # success: return/move PDF
                 temp_pdf = os.path.join(temp_dir, "resume.pdf")
                 if not os.path.exists(temp_pdf):
                     raise Exception("PDF was not generated. Check LaTeX packages/macros in the output.")
@@ -157,6 +160,13 @@ class ParseData:
                 return output_filename
 
             except subprocess.TimeoutExpired:
-                raise Exception("LaTeX compilation timed out. Check for infinite loops or very large includes.")
-            except Exception as e:
-                raise Exception(f"Failed to generate PDF: {e}")
+                # Include a bit of the log to help diagnose slow/looping compiles
+                log_path = os.path.join(temp_dir, "resume.log")
+                tail = ""
+                if os.path.exists(log_path):
+                    with open(log_path, "r", encoding="utf-8", errors="ignore") as lf:
+                        tail = "".join(lf.readlines()[-120:])
+                raise Exception(
+                    "LaTeX compilation timed out. Consider increasing LATEX_TIMEOUT_SEC or simplifying the template.\n"
+                    f"Log tail:\n{tail}"
+                )
