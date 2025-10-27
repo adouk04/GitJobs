@@ -10,6 +10,8 @@ import re
 from dotenv import load_dotenv
 from openai import OpenAI
 import discord
+import logging
+
 
 load_dotenv()
 client = OpenAI()
@@ -100,6 +102,11 @@ class ParseData:
                 # max_tokens can be omitted or set high if you expect long docs
                 temperature=0.2,
             )
+            usage = response.usage
+            logging.info(f"Prompt Resume Tailor tokens: {usage.prompt_tokens}, Completion tokens: {usage.completion_tokens}, Total: {usage.total_tokens}")
+
+            # You can also print it for Cloud Run logs
+            print(f"[OpenAI Tokens] Resume Tailor prompt={usage.prompt_tokens}, completion={usage.completion_tokens}, total={usage.total_tokens}")
         except Exception as e:
             raise Exception(f"OpenAI API error: {e}")
 
@@ -157,7 +164,7 @@ class ParseData:
                 output_filename = "Tailored_Resume.pdf"
                 with open(temp_pdf, "rb") as src, open(output_filename, "wb") as dst:
                     dst.write(src.read())
-                return output_filename
+                return output_filename, latex_content
 
             except subprocess.TimeoutExpired:
                 # Include a bit of the log to help diagnose slow/looping compiles
@@ -170,3 +177,53 @@ class ParseData:
                     "LaTeX compilation timed out. Consider increasing LATEX_TIMEOUT_SEC or simplifying the template.\n"
                     f"Log tail:\n{tail}"
                 )
+
+    @staticmethod
+    def summarize_changes(original_text: str, tailored_latex: str) -> str:
+        """
+        Ask the model to summarize changes between original resume text and
+        tailored LaTeX output. Returns a markdown string (<= 1800 chars if possible).
+        """
+        try:
+            res = client.chat.completions.create(
+                model="gpt-4o",
+                temperature=0.2,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": (
+                            "You are an expert technical recruiter. "
+                            "Summarize the precise edits made to a resume. "
+                            "Output concise **Markdown** only. "
+                            "Prefer short bullets with action verbs and measurable outcomes."
+                        )
+                    },
+                    {
+                        "role": "user",
+                        "content": (
+                            "Original resume text:\n"
+                            "-----\n"
+                            f"{original_text}\n"
+                            "-----\n\n"
+                            "Tailored LaTeX output (resume body; ignore LaTeX boilerplate):\n"
+                            "-----\n"
+                            f"{tailored_latex}\n"
+                            "-----\n\n"
+                            "Return:\n"
+                            "1) **Top 3 improvements** (ATS or clarity/impact) as bullets\n"
+                            "2) **Changed phrases**: a short list of before → after pairs (3–6 items)\n"
+                            "3) **Keywords surfaced**: comma-separated\n"
+                            "Keep under ~1800 characters."
+                        )
+                    }
+                ],
+            )
+            usage = res.usage
+            logging.info(f"Summary Prompt tokens: {usage.prompt_tokens}, Completion tokens: {usage.completion_tokens}, Total: {usage.total_tokens}")
+
+            # You can also print it for Cloud Run logs
+            print(f"[OpenAI Tokens] Summary prompt={usage.prompt_tokens}, completion={usage.completion_tokens}, total={usage.total_tokens}")
+            md = res.choices[0].message.content or "No change summary produced."
+            return md.strip()
+        except Exception as e:
+            return f"Could not produce change summary: {e}"

@@ -49,39 +49,75 @@ class TailorResume:
 
             # 4) Build prompt & generate PDF
             prompt = f"""
-                I would like you to act as a Senior Human Resources professional with 20 years 
-                of Human Resources experience. You are an expert at reviewing resumes, selecting 
-                the best candidates for interviews, and deciding who to hire. Your career experience 
-                has made you a recognized expert in the field of Human Resources at using Applicant 
-                Tracking Systems like Workday, BambooHR, Taleo, iCIMS, and others to select the best 
-                resumes that have been submitted and filter out applicants who do not meet the requirements
-                for the job. I am going to provide you with the text of a job description and 
-                I would like you to please provide me with the three most important responsibilities 
-                in the job description and the five most important key words or phrases an applicant 
-                tracking system will be looking for in resumes. Here is the job description:
-                {job_description}
-                That was great - thank you very much for your help! Now I am going to 
-                provide you with the text of my current resume. I would like you to please 
-                help me tailor my resume to the job description based on the three most important 
-                responsibilities and the top five key words that you noted. In addition, if there are 
-                changes you believe would make my resume a stronger fit, please also provide those changes.
-                I would like you to output the results in a two column format. The column on the left 
-                should show the original text of my resume and the column on the right should show the 
-                new text with the changes you suggest.
-                This is my original resume: {text}
-                Please format the tailored resume using this structure:
-                When formatting, please make sure to preserve all Latex structure and formatting, escape 
-                special characters properly, and do not modify macro definitions, and the output must
-                be valid Latex that compiles without errors.
-                {resumeFormats.alex_format}
-                """
+            Act as a **Senior Technical Recruiter (20+ yrs)** experienced in hiring **Software Engineers** at top tech firms.
+            You are an expert at using **ATS (Workday, Lever, Greenhouse, Taleo, iCIMS)** to evaluate resumes for 
+            **SWE, SDE Intern, and Data/Systems** roles.
+
+            ---
+
+            ### Stage 1 — Job Description Analysis
+            From the job description below, extract:
+            - **Top 3 responsibilities**
+            - **Top 5 ATS keywords** (focus on SWE-relevant terms like data structures, algorithms, debugging, scalability, APIs, testing, collaboration).
+
+            ---
+
+            ### Stage 2 — Resume Tailoring
+            Then tailor the provided resume to align with those responsibilities and keywords.
+
+            Guidelines:
+            - Use **action verbs + quantifiable impact** (e.g., “Improved system efficiency by 20%”).
+            - Highlight problem-solving, teamwork, and scalability experience.
+            - **Do NOT add or infer** any new tech stacks, frameworks, or tools not already in the resume.
+            - You may reword, reorder, or tighten bullets for clarity and ATS optimization.
+            - Maintain **factual accuracy** and preserve all **LaTeX structure/macros** so the output compiles cleanly.
+            - Avoid soft, generic language (e.g., “motivated,” “team player”) unless contextualized.
+
+            ---
+
+            ### Output
+            Return a **two-column markdown table**:
+
+            | Original Resume Text | Tailored Resume Text |
+            |-----------------------|----------------------|
+
+            After the table, add a short **Summary of Changes** listing:
+            - Top 3 changes that improved ATS alignment
+            - Example phrases made more technical or measurable.
+
+            ---
+
+            **Job Description:**  
+            {job_description}
+
+            **Candidate Resume:**  
+            {text}
+
+            Follow {resumeFormats.alex_format} for LaTeX formatting consistency.
+            """
+
             try:
-                processed_resume_path = await asyncio.to_thread(ParseData.parseResume, text, prompt)
+                pdf_path, tailored_latex = await asyncio.to_thread(ParseData.parseResume, text, prompt)
+                change_md = await asyncio.to_thread(ParseData.summarize_changes, text, tailored_latex)
+
                 await interaction.followup.send(
                     content="Here’s your tailored resume!",
-                    file=discord.File(processed_resume_path),
+                    file=discord.File(pdf_path),
                     ephemeral=True
                 )
+                # 2) Send the change summary (inline if short; else attach)
+                if len(change_md) <= 1800:
+                    await interaction.followup.send(content=change_md, ephemeral=True)
+                else:
+                    # write to a temp markdown file and attach
+                    fname = "changes.md"
+                    with open(fname, "w", encoding="utf-8") as f:
+                        f.write(change_md)
+                    await interaction.followup.send(
+                        content="Summary of changes attached.",
+                        file=discord.File(fname),
+                        ephemeral=True
+                    )
             except Exception as e:
                 await interaction.followup.send(f"Error generating tailored resume: {e}", ephemeral=True)
 
