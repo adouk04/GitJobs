@@ -17,7 +17,8 @@ class HealthHandler(BaseHTTPRequestHandler):
 
 def start_health_server():
     port = int(os.getenv("PORT", "8080"))  # Cloud Run sets PORT
-    HTTPServer(("", port), HealthHandler).serve_forever()
+    server = HTTPServer(("", port), HealthHandler)
+    server.serve_forever()
 
 threading.Thread(target=start_health_server, daemon=True).start()
 # -----------------------------------------------------------------------
