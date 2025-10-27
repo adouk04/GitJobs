@@ -99,23 +99,23 @@ class TailorResume:
             try:
                 pdf_path, tailored_latex = await asyncio.to_thread(ParseData.parseResume, text, prompt)
                 change_md = await asyncio.to_thread(ParseData.summarize_changes, text, tailored_latex)
-
+                print(f"Change summary length: {len(change_md)}")
                 await interaction.followup.send(
                     content="Here’s your tailored resume!",
                     file=discord.File(pdf_path),
                     ephemeral=True
                 )
                 # 2) Send the change summary (inline if short; else attach)
-                if len(change_md) <= 1800:
-                    await interaction.followup.send(content=change_md, ephemeral=True)
+                if change_md:
+                    parts = split_message(change_md)
+                    for i, chunk in enumerate(parts):
+                        await interaction.followup.send(
+                            content=f"**Change Summary (Part {i+1}/{len(parts)})**\n{chunk}",
+                            ephemeral=True
+                        )
                 else:
-                    # write to a temp markdown file and attach
-                    fname = "changes.md"
-                    with open(fname, "w", encoding="utf-8") as f:
-                        f.write(change_md)
                     await interaction.followup.send(
-                        content="Summary of changes attached.",
-                        file=discord.File(fname),
+                        content="No summary of changes was generated.",
                         ephemeral=True
                     )
             except Exception as e:
@@ -131,3 +131,10 @@ class TailorResume:
             text = re.sub(r'[ \t]+', ' ', text)
             text = re.sub(r'\n{3,}', '\n\n', text).strip()
             return text
+        
+        def split_message(text, limit=1800):
+            """Split text safely into chunks below Discord's 2000 char limit."""
+            clean = text.replace("```", "`")  # avoid fence blowups
+            return [clean[i:i+limit] for i in range(0, len(clean), limit)]
+
+                
