@@ -20,6 +20,8 @@ class TailorResume:
         
         async def tailor_resume(interaction: Interaction, file:Attachment, job_description: str):
 
+            await interaction.response.defer(ephemeral=True, thinking=True)
+
             if not file.filename.lower().endswith(".pdf"):
                 await interaction.response.send_message(
                     "Please upload a valid `.pdf` file.",
