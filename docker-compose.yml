@@ -1,0 +1,19 @@
+version: "3.8"
+
+services:
+  gitjobsbot:
+    build: .
+    container_name: gitjobsbot
+    restart: unless-stopped
+    env_file: .env
+    # Persist MiKTeX package cache so new LaTeX packages survive restarts
+    volumes:
+      - miktex-packages:/var/lib/miktex
+      # If you ever switch to user-tree installs, also persist /root/.miktex:
+      # - miktex-user:/root/.miktex
+    command: ["python3", "main.py"]
+    # No ports needed for a Discord gateway bot
+
+volumes:
+  miktex-packages:
+  # miktex-user:

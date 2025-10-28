@@ -2,14 +2,12 @@ from typing import Optional
 import re
 import shutil
 import os
-import os
 import subprocess
 import tempfile
-import shutil
-import re
 from dotenv import load_dotenv
 from openai import OpenAI
 import discord
+import logging
 
 load_dotenv()
 client = OpenAI()
@@ -57,24 +55,7 @@ class ParseData:
             if os.path.exists(p):
                 return p
         return None
-
-    @staticmethod
-    def check_latex_installed() -> bool:
-        path = ParseData.get_pdflatex_path()
-        if not path:
-            return False
-        try:
-            subprocess.run([path, "--version"], capture_output=True, text=True, check=True)
-            return True
-        except Exception:
-            return False
-
-    @staticmethod
-    def _strip_code_fences(latex: str) -> str:
-        """Remove ```...``` fences if the model returned them."""
-        m = re.search(r"```(?:latex)?\s*(.*?)```", latex, re.DOTALL | re.IGNORECASE)
-        return m.group(1).strip() if m else latex
-
+        
     @staticmethod
     def parseResume(resume, prompt):
         # Ensure LaTeX present
@@ -93,13 +74,19 @@ class ParseData:
                 messages=[
                     {"role": "system", "content": (
                         "You are a professional resume editor who outputs ONLY valid LaTeX. "
-                        "Do not include code fences. Preserve the LaTeX structure exactly as provided."
+                        "Do not include code fences, analysis, or markdown. "
+                        "Use the provided LaTeX template structure and ensure it compiles."
                     )},
                     {"role": "user", "content": prompt}
                 ],
                 # max_tokens can be omitted or set high if you expect long docs
                 temperature=0.2,
             )
+            usage = response.usage
+            logging.info(f"Prompt Resume Tailor tokens: {usage.prompt_tokens}, Completion tokens: {usage.completion_tokens}, Total: {usage.total_tokens}")
+
+            # You can also print it for Cloud Run logs
+            print(f"[OpenAI Tokens] Resume Tailor prompt={usage.prompt_tokens}, completion={usage.completion_tokens}, total={usage.total_tokens}")
         except Exception as e:
             raise Exception(f"OpenAI API error: {e}")
 
@@ -116,6 +103,8 @@ class ParseData:
             with open(tex_file, "w", encoding="utf-8") as f:
                 f.write(latex_content)
 
+            LATEX_TIMEOUT = int(os.getenv("LATEX_TIMEOUT_SEC", "300"))  # per-run timeout (sec)
+
             try:
                 # Run pdflatex 2–3 times; include safe flags and a timeout
                 for i in range(3):
@@ -131,7 +120,7 @@ class ParseData:
                         cwd=temp_dir,
                         capture_output=True,
                         text=True,
-                        timeout=60  # prevent hanging
+                        timeout=LATEX_TIMEOUT  # prevent hanging
                     )
                     if result.returncode != 0:
                         # Surface the most useful error lines
@@ -160,3 +149,20 @@ class ParseData:
                 raise Exception("LaTeX compilation timed out. Check for infinite loops or very large includes.")
             except Exception as e:
                 raise Exception(f"Failed to generate PDF: {e}")
+            
+    @staticmethod
+    def _strip_code_fences(latex: str) -> str:
+        """Remove ```...``` fences if the model returned them."""
+        m = re.search(r"```(?:latex)?\s*(.*?)```", latex, re.DOTALL | re.IGNORECASE)
+        return m.group(1).strip() if m else latex
+    
+    @staticmethod
+    def check_latex_installed() -> bool:
+        path = ParseData.get_pdflatex_path()
+        if not path:
+            return False
+        try:
+            subprocess.run([path, "--version"], capture_output=True, text=True, check=True)
+            return True
+        except Exception:
+            return False

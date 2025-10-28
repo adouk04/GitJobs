@@ -35,8 +35,10 @@ class TailorResume:
                     ephemeral=True
                 )
                 return
+            
+            await interaction.response.defer(ephemeral=True, thinking=True)
 
-            await interaction.response.send_message(f"Received {file.filename}", ephemeral=True)
+            await interaction.followup.send_message(f"Received {file.filename}", ephemeral=True)
             
             try:
                 pdf_bytes = await file.read()
@@ -65,30 +67,33 @@ class TailorResume:
             resume = text
             #parse data
             prompt = f"""
-                I would like you to act as a Senior Human Resources professional with 20 years 
-                of Human Resources experience. You are an expert at reviewing resumes, selecting 
-                the best candidates for interviews, and deciding who to hire. Your career experience 
-                has made you a recognized expert in the field of Human Resources at using Applicant 
-                Tracking Systems like Workday, BambooHR, Taleo, iCIMS, and others to select the best 
-                resumes that have been submitted and filter out applicants who do not meet the requirements
-                for the job. I am going to provide you with the text of a job description and 
-                I would like you to please provide me with the three most important responsibilities 
-                in the job description and the five most important key words or phrases an applicant 
-                tracking system will be looking for in resumes. Here is the job description:
+                You are a **Senior Technical Recruiter (20+ yrs)** experienced in hiring **Software Engineers** at top tech firms.
+                You are an expert at using **ATS (Workday, Lever, Greenhouse, Taleo, iCIMS)** to evaluate resumes for 
+                **SWE Interns, SDE Intern, Data/Systems interns, etc** roles.
+
+                ---
+
+                ### Task
+                Analyze the following job description and candidate resume, then **tailor the resume** to align with the most relevant
+                responsibilities and keywords from the description.
+
+                ### Guidelines
+                - Focus on **data structures, algorithms, debugging, scalability, APIs, CI/CD, distributed systems, and ownership**.
+                - Use **action verbs + quantifiable impact** (e.g., “Improved system efficiency by 20%”).
+                - Highlight collaboration, problem-solving, and scalability experience.
+                - **Do NOT add or infer** any new tech stacks, frameworks, or tools not already listed.
+                - Maintain **factual accuracy** and preserve all **LaTeX structure/macros**.
+                - **Output only valid LaTeX** that compiles. Do NOT include markdown, analysis, explanations, or code fences.
+
+                ---
+
+                **Job Description:**  
                 {job_description}
-                That was great - thank you very much for your help! Now I am going to 
-                provide you with the text of my current resume. I would like you to please 
-                help me tailor my resume to the job description based on the three most important 
-                responsibilities and the top five key words that you noted. In addition, if there are 
-                changes you believe would make my resume a stronger fit, please also provide those changes.
-                I would like you to output the results in a two column format. The column on the left 
-                should show the original text of my resume and the column on the right should show the 
-                new text with the changes you suggest.
-                {resume}
-                Please format the tailored resume using this structure:
-                When formatting, please make sure to preserve all Latex structure and formatting, escape 
-                special characters properly, and do not modify macro definitions, and the output must
-                be valid Latex that compiles without errors.
+
+                **Candidate Resume (plain text):**  
+                {text}
+
+                Use this LaTeX template for formatting consistency:  
                 {resumeFormats.alex_format}
                 """
             try:
