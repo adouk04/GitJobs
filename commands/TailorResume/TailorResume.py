@@ -12,6 +12,19 @@ class TailorResume:
         self.tree = tree
         self._register()
 
+    @staticmethod
+    def extract_text_pdf(pdf_bytes: bytes) -> str:
+        text_chunks = []
+        with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
+            for page in pdf.pages:
+                t = page.extract_text() or ""
+                text_chunks.append(t)
+        text = "\n".join(text_chunks)
+        text = re.sub(r'[ \t]+', ' ', text)
+        text = re.sub(r'\n{3,}', '\n\n', text).strip()
+        return text
+        
+
     def _register(self):
         @self.tree.command(name="tailor_resume", description="tailors resume for user")
         async def tailor_resume(interaction: Interaction, file: Attachment, job_description: str):
@@ -28,7 +41,7 @@ class TailorResume:
             text = ""
             try:
                 pdf_bytes = await file.read()
-                text = extract_text_pdf(pdf_bytes)
+                text = TailorResume.extract_text_pdf(pdf_bytes)
                 if not text.strip():
                     await interaction.followup.send(
                         "I couldn’t extract any text—this PDF may be image-only. Try an OCR’d PDF.",
@@ -86,15 +99,3 @@ class TailorResume:
         
             except Exception as e:
                 await interaction.followup.send(f"Error generating tailored resume: {e}", ephemeral=True)
-
-    def extract_text_pdf(pdf_bytes: bytes) -> str:
-        text_chunks = []
-        with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
-            for page in pdf.pages:
-                t = page.extract_text() or ""
-                text_chunks.append(t)
-        text = "\n".join(text_chunks)
-        text = re.sub(r'[ \t]+', ' ', text)
-        text = re.sub(r'\n{3,}', '\n\n', text).strip()
-        return text
-    
