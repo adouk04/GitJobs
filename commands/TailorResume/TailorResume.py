@@ -16,7 +16,6 @@ class TailorResume:
         @self.tree.command(name="tailor_resume", description="tailors resume for user")
         async def tailor_resume(interaction: Interaction, file: Attachment, job_description: str):
 
-            # 2) All messages after defer -> followup.send
             if not file.filename.lower().endswith(".pdf"):
                 await interaction.response.send_message("Please upload a valid `.pdf` file.", ephemeral=True)
                 return
@@ -26,7 +25,6 @@ class TailorResume:
             
             await interaction.followup.send(f"Received `{file.filename}`. Extracting text…", ephemeral=True)
 
-            # 3) Extract text (ensure `text` defined on error paths)
             text = ""
             try:
                 pdf_bytes = await file.read()
@@ -100,7 +98,3 @@ class TailorResume:
         text = re.sub(r'\n{3,}', '\n\n', text).strip()
         return text
     
-    def split_message(text, limit=1800):
-        """Split text safely into chunks below Discord's 2000-char limit."""
-        clean = text.replace("```", "`").replace("@", "@\u200b")  # prevent accidental mentions
-        return [clean[i:i+limit] for i in range(0, len(clean), limit)]
