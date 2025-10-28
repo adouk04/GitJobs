@@ -16,17 +16,18 @@ class TailorResume:
         @self.tree.command(name="tailor_resume", description="tailors resume for user")
         async def tailor_resume(interaction: Interaction, file: Attachment, job_description: str):
             # 1) Acknowledge ONCE
-            await interaction.response.defer(ephemeral=True, thinking=True)
 
             # 2) All messages after defer -> followup.send
             if not file.filename.lower().endswith(".pdf"):
-                await interaction.followup.send("Please upload a valid `.pdf` file.", ephemeral=True)
+                await interaction.response.send("Please upload a valid `.pdf` file.", ephemeral=True)
                 return
 
             if file.size > 25 * 1024 * 1024:
-                await interaction.followup.send("File too large! Please upload a file smaller than 25MB.", ephemeral=True)
+                await interaction.response.send("File too large! Please upload a file smaller than 25MB.", ephemeral=True)
                 return
-
+            
+            await interaction.response.defer(ephemeral=True, thinking=True)
+            
             await interaction.followup.send(f"Received `{file.filename}`. Extracting text…", ephemeral=True)
 
             # 3) Extract text (ensure `text` defined on error paths)
@@ -40,6 +41,7 @@ class TailorResume:
                         ephemeral=True
                     )
                     return
+                
                 await interaction.followup.send(
                     f"Extracted ~{len(text)} characters. Tailoring now…", ephemeral=True
                 )
@@ -115,8 +117,9 @@ class TailorResume:
             return text
         
         def split_message(text, limit=1800):
-            """Split text safely into chunks below Discord's 2000 char limit."""
-            clean = text.replace("```", "`")  # avoid fence blowups
+            """Split text safely into chunks below Discord's 2000-char limit."""
+            clean = text.replace("```", "`").replace("@", "@\u200b")  # prevent accidental mentions
             return [clean[i:i+limit] for i in range(0, len(clean), limit)]
+
 
                 
