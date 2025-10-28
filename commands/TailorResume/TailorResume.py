@@ -19,11 +19,11 @@ class TailorResume:
 
             # 2) All messages after defer -> followup.send
             if not file.filename.lower().endswith(".pdf"):
-                await interaction.response.send("Please upload a valid `.pdf` file.", ephemeral=True)
+                await interaction.response.send_message("Please upload a valid `.pdf` file.", ephemeral=True)
                 return
 
             if file.size > 25 * 1024 * 1024:
-                await interaction.response.send("File too large! Please upload a file smaller than 25MB.", ephemeral=True)
+                await interaction.response.send_message("File too large! Please upload a file smaller than 25MB.", ephemeral=True)
                 return
             
             await interaction.response.defer(ephemeral=True, thinking=True)
@@ -121,5 +121,4 @@ class TailorResume:
             clean = text.replace("```", "`").replace("@", "@\u200b")  # prevent accidental mentions
             return [clean[i:i+limit] for i in range(0, len(clean), limit)]
 
-
-                
+           

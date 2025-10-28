@@ -72,12 +72,6 @@ class ParseData:
             return False
 
     @staticmethod
-    def _strip_code_fences(latex: str) -> str:
-        """Remove ```...``` fences if the model returned them."""
-        m = re.search(r"```(?:latex)?\s*(.*?)```", latex, re.DOTALL | re.IGNORECASE)
-        return m.group(1).strip() if m else latex
-
-    @staticmethod
     def parseResume(resume, prompt):
         # Ensure LaTeX present
         if not ParseData.check_latex_installed():
@@ -228,3 +222,16 @@ class ParseData:
             return md.strip()
         except Exception as e:
             return f"Could not produce change summary: {e}"
+    @staticmethod
+    def _strip_code_fences(latex: str) -> str:
+        """Ensure the LaTeX content is valid by adding missing document tags."""
+        m = re.search(r"```(?:latex)?\s*(.*?)```", latex, re.DOTALL | re.IGNORECASE)
+        content = m.group(1).strip() if m else latex.strip()
+        
+        # Ensure \begin{document} and \end{document} are present
+        if not re.search(r"\\begin\{document\}", content):
+            content = "\\begin{document}\n" + content
+        if not re.search(r"\\end\{document\}", content):
+            content += "\n\\end{document}"
+        
+        return content
