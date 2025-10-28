@@ -95,7 +95,8 @@ class ParseData:
                 messages=[
                     {"role": "system", "content": (
                         "You are a professional resume editor who outputs ONLY valid LaTeX. "
-                        "Do not include code fences. Preserve the LaTeX structure exactly as provided."
+                        "Do not include code fences, analysis, or markdown. "
+                        "Use the provided LaTeX template structure and ensure it compiles."
                     )},
                     {"role": "user", "content": prompt}
                 ],
@@ -112,7 +113,7 @@ class ParseData:
 
         latex_content = response.choices[0].message.content or ""
         latex_content = ParseData._strip_code_fences(latex_content)
-
+        
         pdflatex_path = ParseData.get_pdflatex_path()
         if not pdflatex_path:
             raise Exception("Could not find pdflatex executable. Please ensure LaTeX is installed.")

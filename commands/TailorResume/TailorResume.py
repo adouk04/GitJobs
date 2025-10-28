@@ -49,53 +49,35 @@ class TailorResume:
 
             # 4) Build prompt & generate PDF
             prompt = f"""
-            Act as a **Senior Technical Recruiter (20+ yrs)** experienced in hiring **Software Engineers** at top tech firms.
+            You are a **Senior Technical Recruiter (20+ yrs)** experienced in hiring **Software Engineers** at top tech firms.
             You are an expert at using **ATS (Workday, Lever, Greenhouse, Taleo, iCIMS)** to evaluate resumes for 
-            **SWE, SDE Intern, and Data/Systems** roles.
+            **SWE Interns, SDE Intern, Data/Systems interns, etc** roles.
 
             ---
 
-            ### Stage 1 — Job Description Analysis
-            From the job description below, extract:
-            - **Top 3 responsibilities**
-            - **Top 5 ATS keywords** (focus on SWE-relevant terms like data structures, algorithms, debugging, scalability, APIs, testing, collaboration).
+            ### Task
+            Analyze the following job description and candidate resume, then **tailor the resume** to align with the most relevant
+            responsibilities and keywords from the description.
 
-            ---
-
-            ### Stage 2 — Resume Tailoring
-            Then tailor the provided resume to align with those responsibilities and keywords.
-
-            Guidelines:
+            ### Guidelines
+            - Focus on **data structures, algorithms, debugging, scalability, APIs, CI/CD, distributed systems, and ownership**.
             - Use **action verbs + quantifiable impact** (e.g., “Improved system efficiency by 20%”).
-            - Highlight problem-solving, teamwork, and scalability experience.
-            - **Do NOT add or infer** any new tech stacks, frameworks, or tools not already in the resume.
-            - You may reword, reorder, or tighten bullets for clarity and ATS optimization.
-            - Maintain **factual accuracy** and preserve all **LaTeX structure/macros** so the output compiles cleanly.
-            - Avoid soft, generic language (e.g., “motivated,” “team player”) unless contextualized.
-
-            ---
-
-            ### Output
-            Return a **two-column markdown table**:
-
-            | Original Resume Text | Tailored Resume Text |
-            |-----------------------|----------------------|
-
-            After the table, add a short **Summary of Changes** listing:
-            - Top 3 changes that improved ATS alignment
-            - Example phrases made more technical or measurable.
+            - Highlight collaboration, problem-solving, and scalability experience.
+            - **Do NOT add or infer** any new tech stacks, frameworks, or tools not already listed.
+            - Maintain **factual accuracy** and preserve all **LaTeX structure/macros**.
+            - **Output only valid LaTeX** that compiles. Do NOT include markdown, analysis, explanations, or code fences.
 
             ---
 
             **Job Description:**  
             {job_description}
 
-            **Candidate Resume:**  
+            **Candidate Resume (plain text):**  
             {text}
 
-            Follow {resumeFormats.alex_format} for LaTeX formatting consistency.
+            Use this LaTeX template for formatting consistency:  
+            {resumeFormats.alex_format}
             """
-
             try:
                 pdf_path, tailored_latex = await asyncio.to_thread(ParseData.parseResume, text, prompt)
                 change_md = await asyncio.to_thread(ParseData.summarize_changes, text, tailored_latex)
