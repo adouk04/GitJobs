@@ -5,12 +5,12 @@ import os
 import subprocess
 import tempfile
 from dotenv import load_dotenv
-from openai import OpenAI
+import openai
 import discord
 import logging
+import time
 
 load_dotenv()
-client = OpenAI()
 
 class ParseData:
     def __init__(self, resume, prompt):
@@ -69,18 +69,22 @@ class ParseData:
 
         # Call OpenAI
         try:
+            # instantiate OpenAI client at call-time so tests can patch openai.OpenAI
+            client = openai.OpenAI()
             response = client.chat.completions.create(
                 model="gpt-4",  # modern model
                 messages=[
                     {"role": "system", "content": (
-                        "You are a professional resume editor who outputs ONLY valid LaTeX. "
-                        "Do not include code fences, analysis, or markdown. "
-                        "Use the provided LaTeX template structure and ensure it compiles."
+                        "You are a professional resume editor who MUST output ONLY a complete, compilable LaTeX document. "
+                        "The document MUST start with a \\documentclass declaration and include \\begin{document} and \\end{document}. "
+                        "Do NOT include any explanation, analysis, code fences, markdown, or extra commentary — return only valid LaTeX source. "
+                        "If you cannot produce a full document, return the word 'ERROR' only."
                     )},
                     {"role": "user", "content": prompt}
                 ],
                 # max_tokens can be omitted or set high if you expect long docs
-                temperature=0.2,
+                temperature=0.0,
+                top_p=1.0,
             )
             usage = response.usage
             logging.info(f"Prompt Resume Tailor tokens: {usage.prompt_tokens}, Completion tokens: {usage.completion_tokens}, Total: {usage.total_tokens}")
@@ -92,6 +96,17 @@ class ParseData:
 
         latex_content = response.choices[0].message.content or ""
         latex_content = ParseData._strip_code_fences(latex_content)
+        # Defensive: if the model returned a fragment (no documentclass or begin{document}),
+        # wrap it into a minimal LaTeX document so pdflatex has the required structure.
+        if not ("\\begin{document}" in latex_content or "\\documentclass" in latex_content):
+            logging.warning("Model returned a LaTeX fragment or non-LaTeX text; applying defensive wrapper to create a minimal document.")
+            latex_content = (
+                "\\documentclass{article}\n"
+                "\\usepackage[utf8]{inputenc}\n"
+                "\\begin{document}\n"
+                + latex_content
+                + "\n\\end{document}\n"
+            )
         
         pdflatex_path = ParseData.get_pdflatex_path()
         if not pdflatex_path:
@@ -131,16 +146,50 @@ class ParseData:
                                 lines = lf.readlines()
                             bang = [ln for ln in lines if ln.lstrip().startswith("!")]
                             excerpt = "".join(bang[:20]) or "".join(lines[-80:])  # fallback: last lines
+                        # Include a short preview of the LaTeX content for diagnostics
+                        latex_preview = latex_content[:1000].replace("\n", "\\n")
+                        # Persist the failing .tex and .log to the current working dir for inspection
+                        try:
+                            ts = int(time.time())
+                            failed_tex = os.path.abspath(f"failed_resume_{ts}.tex")
+                            failed_log = os.path.abspath(f"failed_resume_{ts}.log")
+                            # copy files out of temp dir if they exist
+                            if os.path.exists(os.path.join(temp_dir, "resume.tex")):
+                                shutil.copy(os.path.join(temp_dir, "resume.tex"), failed_tex)
+                            if os.path.exists(log_path):
+                                shutil.copy(log_path, failed_log)
+                        except Exception:
+                            # best-effort only; do not mask original error
+                            failed_tex = "(could not save failed tex)"
+                            failed_log = "(could not save failed log)"
+
                         raise Exception(
                             "LaTeX compilation failed.\n"
                             f"stderr:\n{result.stderr}\n\n"
-                            f"log (first errors):\n{excerpt or '(no error lines found)'}"
+                            f"log (first errors):\n{excerpt or '(no error lines found)'}\n\n"
+                            f"latex_preview(first 1000 chars):\n{latex_preview}\n\n"
+                            f"Saved debug files: {failed_tex}, {failed_log}\n"
                         )
 
                 # success: return/move PDF
                 temp_pdf = os.path.join(temp_dir, "resume.pdf")
                 if not os.path.exists(temp_pdf):
-                    raise Exception("PDF was not generated. Check LaTeX packages/macros in the output.")
+                    # copy the .tex and .log out for inspection and include paths in the exception
+                    try:
+                        ts = int(time.time())
+                        failed_tex = os.path.abspath(f"failed_resume_{ts}.tex")
+                        failed_log = os.path.abspath(f"failed_resume_{ts}.log")
+                        if os.path.exists(os.path.join(temp_dir, "resume.tex")):
+                            shutil.copy(os.path.join(temp_dir, "resume.tex"), failed_tex)
+                        if os.path.exists(os.path.join(temp_dir, "resume.log")):
+                            shutil.copy(os.path.join(temp_dir, "resume.log"), failed_log)
+                    except Exception:
+                        failed_tex = "(could not save failed tex)"
+                        failed_log = "(could not save failed log)"
+                    raise Exception(
+                        "PDF was not generated. Check LaTeX packages/macros in the output.\n"
+                        f"Saved debug files: {failed_tex}, {failed_log}"
+                    )
                 output_filename = "Tailored_Resume.pdf"
                 with open(temp_pdf, "rb") as src, open(output_filename, "wb") as dst:
                     dst.write(src.read())
@@ -153,9 +202,35 @@ class ParseData:
             
     @staticmethod
     def _strip_code_fences(latex: str) -> str:
-        """Remove ```...``` fences if the model returned them."""
-        m = re.search(r"```(?:latex)?\s*(.*?)```", latex, re.DOTALL | re.IGNORECASE)
-        return m.group(1).strip() if m else latex
+            """
+            Remove triple-backtick code fences and any language token like ```latex, ```tex, ```random.
+            If fences are incomplete or not present, return the original string unchanged.
+            Handles leading/trailing whitespace around fences.
+            """
+            if latex is None:
+                return ""
+
+            text = latex.strip()
+
+            # Pattern 1: ```<lang>\n...body...\n```
+            m = re.match(r"^```[ \t]*([A-Za-z0-9_-]+)?\s*\n(.*)\n```[ \t]*$", text, flags=re.DOTALL)
+            if m:
+                return m.group(2).strip()
+
+            # Pattern 2: ```<lang> ...body... ``` (no mandatory newlines after opening)
+            m = re.match(r"^```[ \t]*([A-Za-z0-9_-]+)?[ \t]*(.*)```[ \t]*$", text, flags=re.DOTALL)
+            if m:
+                # If there was a language, it will be in group(1); drop it and return the rest
+                body = m.group(2)
+                return body.strip()
+
+            # Pattern 3: plain fences with no language
+            m = re.match(r"^```\s*\n(.*)\n```\s*$", text, flags=re.DOTALL)
+            if m:
+                return m.group(1).strip()
+
+            # No full fence match → return original unchanged (covers incomplete fences)
+            return latex
     
     @staticmethod
     def check_latex_installed() -> bool:
@@ -163,7 +238,7 @@ class ParseData:
         if not path:
             return False
         try:
-            subprocess.run([path, "--version"], capture_output=True, text=True, check=True)
-            return True
+            rc = subprocess.run([path, "--version"], capture_output=True)
+            return rc.returncode == 0
         except Exception:
             return False
