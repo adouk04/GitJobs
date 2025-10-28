@@ -92,7 +92,7 @@ class ParseData:
 
         latex_content = response.choices[0].message.content or ""
         latex_content = ParseData._strip_code_fences(latex_content)
-
+        
         pdflatex_path = ParseData.get_pdflatex_path()
         if not pdflatex_path:
             raise Exception("Could not find pdflatex executable. Please ensure LaTeX is installed.")
@@ -102,7 +102,7 @@ class ParseData:
             tex_file = os.path.join(temp_dir, "resume.tex")
             with open(tex_file, "w", encoding="utf-8") as f:
                 f.write(latex_content)
-
+            
             LATEX_TIMEOUT = int(os.getenv("LATEX_TIMEOUT_SEC", "300"))  # per-run timeout (sec)
 
             try:
@@ -129,21 +129,22 @@ class ParseData:
                         if os.path.exists(log_path):
                             with open(log_path, "r", encoding="utf-8", errors="ignore") as lf:
                                 lines = lf.readlines()
-                            bang_lines = [ln for ln in lines if ln.lstrip().startswith("!")]
-                            excerpt = "".join(bang_lines[:10])
+                            bang = [ln for ln in lines if ln.lstrip().startswith("!")]
+                            excerpt = "".join(bang[:20]) or "".join(lines[-80:])  # fallback: last lines
                         raise Exception(
                             "LaTeX compilation failed.\n"
                             f"stderr:\n{result.stderr}\n\n"
                             f"log (first errors):\n{excerpt or '(no error lines found)'}"
                         )
 
+                # success: return/move PDF
                 temp_pdf = os.path.join(temp_dir, "resume.pdf")
                 if not os.path.exists(temp_pdf):
                     raise Exception("PDF was not generated. Check LaTeX packages/macros in the output.")
                 output_filename = "Tailored_Resume.pdf"
                 with open(temp_pdf, "rb") as src, open(output_filename, "wb") as dst:
                     dst.write(src.read())
-                return output_filename
+                return output_filename, latex_content
 
             except subprocess.TimeoutExpired:
                 raise Exception("LaTeX compilation timed out. Check for infinite loops or very large includes.")
