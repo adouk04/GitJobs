@@ -70,7 +70,7 @@ class ParseData:
         # Call OpenAI
         try:
             response = client.chat.completions.create(
-                model="gpt-4o",  # modern model
+                model="gpt-4",  # modern model
                 messages=[
                     {"role": "system", "content": (
                         "You are a professional resume editor who outputs ONLY valid LaTeX. "

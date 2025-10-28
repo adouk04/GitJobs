@@ -24,25 +24,6 @@ def start_health_server():
 threading.Thread(target=start_health_server, daemon=True).start()
 # -----------------------------------------------------------------------
 
-load_dotenv()
-
-from commands.TailorResume.TailorResume import TailorResume
-
-# ---- Cloud Run health server (so the container "listens on $PORT") ----
-class HealthHandler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        self.send_response(200)
-        self.end_headers()
-        self.wfile.write(b"ok")
-
-def start_health_server():
-    port = int(os.getenv("PORT", "8080"))  # Cloud Run sets PORT
-    server = HTTPServer(("", port), HealthHandler)
-    server.serve_forever()
-
-threading.Thread(target=start_health_server, daemon=True).start()
-# -----------------------------------------------------------------------
-
 load_dotenv()  # used locally; in Cloud Run, env vars come from the service config
 
 # Required env vars
