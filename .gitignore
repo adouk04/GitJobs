@@ -1,3 +1,18 @@
-.env
+# Python cache & virtual env
+__pycache__/
 .venv/
-.__pycache__/
+
+# Local test files
+tests/
+pytest.ini
+pytest_cache/
+
+# Environment variables
+.env
+
+# Local dev files
+docker-compose.yml
+
+# Misc
+*.pdf
+.DS_Store
