@@ -1,8 +1,8 @@
 from discord import app_commands, Interaction, Attachment
 import pdfplumber, re, io
-from parseData import ParseData
+from test_parseData import ParseData
 import discord
-import resumeFormats
+import test_resume_format
 import asyncio
 
 class TailorResume:
@@ -30,7 +30,7 @@ class TailorResume:
         
 
     def _register(self):
-        @self.tree.command(name="tailor_resume", description="tailors resume for user")
+        @self.tree.command(name="test_command", description="tailors resume for user")
         async def tailor_resume(interaction: Interaction, file: Attachment, job_description: str):
 
             if not file.filename.lower().endswith(".pdf"):
@@ -92,7 +92,7 @@ class TailorResume:
                 {text}
 
                 Use this LaTeX template for formatting consistency:  
-                {resumeFormats.alex_format}
+                {test_resume_format.alex_format}
                 """
             try:
                 # Run the blocking LaTeX call in a background thread

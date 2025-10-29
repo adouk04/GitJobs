@@ -1,0 +1,77 @@
+import discord
+import threading
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from dotenv import load_dotenv
+from discord import app_commands
+from test_TailorResume import TailorResume
+import os
+import threading
+from http.server import BaseHTTPRequestHandler, HTTPServer
+
+# ---- Cloud Run health server (so the container "listens on $PORT") ----
+class HealthHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"ok")
+
+def start_health_server():
+    port = int(os.getenv("PORT", "8080"))  # Cloud Run sets PORT
+    server = HTTPServer(("", port), HealthHandler)
+    server.serve_forever()
+
+threading.Thread(target=start_health_server, daemon=True).start()
+# -----------------------------------------------------------------------
+
+load_dotenv()  # used locally; in Cloud Run, env vars come from the service config
+
+#Use only if testing
+DISCORD_BOT_TOKEN = os.getenv("DISCORD_BOT_TEST_TOKEN")
+if not DISCORD_BOT_TOKEN:
+    raise ValueError("Missing DISCORD_BOT_TEST_TOKEN in .env, raised in main file")
+
+DISCORD_CHANNEL_TOKEN = os.getenv("DISCORD_CHANNEL")
+if not DISCORD_CHANNEL_TOKEN:
+    raise ValueError("Missing DISCORD_CHANNEL_TOKEN in .env, raise in main")
+DISCORD_SERVER_ID = os.getenv("DISCORD_SERVER_ID")
+if not DISCORD_SERVER_ID:
+    raise ValueError("Missing DISCORD_SERVER_ID in .env, raise in main")
+
+intents = discord.Intents.default()
+client = discord.Client(intents=intents)
+tree = app_commands.CommandTree(client)
+
+# Register commands BEFORE on_ready (safe & clear)
+TailorResume(tree)
+
+@client.event
+async def on_ready():
+    print(f"Logged in as {client.user} ({client.user.id})")
+
+    try:
+        guild = discord.Object(id=DISCORD_SERVER_ID)
+
+        # If your commands are defined without guild=..., they are "global".
+        # Copy them to the guild for INSTANT availability:
+        tree.copy_global_to(guild=guild)
+
+        # Sync to the guild (fast). This registers/updates guild-scoped versions.
+        await tree.sync(guild=guild)
+
+        # Optional: also sync globals (can take up to ~1 hour to propagate):
+        # await tree.sync()
+
+        print("Slash commands synced to guild.")
+    except Exception as e:
+        print(f"[slash sync] {e}")
+
+    # Send a boot message to a specific channel
+    channel = client.get_channel(DISCORD_CHANNEL_TOKEN) or await client.fetch_channel(DISCORD_CHANNEL_TOKEN)
+    if channel:
+        try:
+            await channel.send("Bot is now online")
+        except Exception as e:
+            print(f"[send] {e}")
+    else:
+        print("[warn] Channel not found; check DISCORD_CHANNEL_ID and bot permissions")
+client.run(DISCORD_BOT_TOKEN)
