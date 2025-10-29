@@ -137,7 +137,7 @@ class ParseData:
                             ts = int(time.time())
                             failed_tex = os.path.abspath(f"failed_resume_{ts}.tex")
                             failed_log = os.path.abspath(f"failed_resume_{ts}.log")
-                            shutil.copy(tex_path, failed_tex)
+                            shutil.copy(log_path, failed_log)
                             if os.path.exists(log_path):
                                 shutil.copy(log_path, failed_log)
                         except Exception:
