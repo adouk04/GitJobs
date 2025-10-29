@@ -57,7 +57,6 @@ class ParseData:
     
     @staticmethod
     def parseResume(prompt):
-        # Ensure LaTeX present
         if not ParseData.check_latex_installed():
             raise Exception(
                 "LaTeX (pdflatex) not found.\n"
@@ -66,26 +65,26 @@ class ParseData:
                 "- Linux: install TeX Live (e.g., `sudo apt install texlive-full`)."
             )
 
-        # Call OpenAI
         try:
-            # instantiate OpenAI client at call-time so tests can patch OpenAI
             client = OpenAI()
 
+            t_api_start = time.monotonic()
+
             response = client.chat.completions.create(
-                model="gpt-4",  # modern model
-                # max_tokens can be omitted or set high if you expect long docs
-                temperature=0.0,
-                top_p=1.0,
+                model="gpt-5",  
+
                 messages=[
                     {"role": "system", "content": (
-                        "You are a professional resume editor who MUST output ONLY a complete, compilable LaTeX document. "
-                        "The document MUST start with a \\documentclass declaration and include \\begin{document} and \\end{document}. "
-                        "Do NOT include any explanation, analysis, code fences, markdown, or extra commentary — return only valid LaTeX source. "
-                        "If you cannot produce a full document, return the word 'ERROR' only."
+                        "You are a senior technical recruiter with 20+ years of experience hiring SWE/SDE/Data interns. "
+                        "You are an expert in ATS systems (Workday, Greenhouse, Lever, Taleo, iCIMS) and LaTeX resume formatting. "
+                        "You MUST output ONLY valid, compilable LaTeX code—no markdown, explanations, or code fences."
                     )},
                     {"role": "user", "content": prompt}
                 ],
             )
+            t_api_end = time.monotonic()
+            print(f"[TIMER] OpenAI API latency: {t_api_end - t_api_start:.2f}s")
+
             if hasattr(response, "usage"):
                 u = response.usage
                 logging.info(f"Prompt tokens={u.prompt_tokens}, Completion tokens={u.completion_tokens}, Total={u.total_tokens}")
@@ -118,6 +117,8 @@ class ParseData:
                 f.write(latex_content)
         
             try:
+                t_compile_start = time.monotonic()
+
                 for _ in range(3):
                     proc = subprocess.run(
                         [pdflatex_path, "-interaction=nonstopmode", "-halt-on-error", "-file-line-error", "-no-shell-escape", "resume.tex"],
@@ -149,7 +150,8 @@ class ParseData:
                             f"latex_preview(first 1000 chars):\n{preview}\n\n"
                             f"Saved debug files: {failed_tex}, {failed_log}\n"
                         )
-
+                t_compile_end = time.monotonic()
+                print(f"[TIMER] LaTeX compile time: {t_compile_end - t_compile_start:.2f}s")
                 pdf_src = os.path.join(temp_dir, "resume.pdf")
                 if not os.path.exists(pdf_src):
                     raise Exception("PDF was not generated. Check LaTeX packages/macros in the output.")

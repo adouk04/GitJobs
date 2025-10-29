@@ -4,6 +4,7 @@ from parseData import ParseData
 import discord
 import resumeFormats
 import asyncio
+import time
 
 class TailorResume:
     def __init__(self, tree: app_commands.CommandTree):
@@ -31,7 +32,7 @@ class TailorResume:
 
     def _register(self):
         @self.tree.command(name="tailor_resume", description="tailors resume for user")
-        async def tailor_resume(interaction: Interaction, file: Attachment, job_description: str):
+        async def tailor_resume(interaction: Interaction, file: Attachment, application_link: str):
 
             if not file.filename.lower().endswith(".pdf"):
                 await interaction.response.send_message("Please upload a valid `.pdf` file.", ephemeral=True)
@@ -62,42 +63,61 @@ class TailorResume:
             except Exception as e:
                 await interaction.followup.send(f"Failed to parse the PDF: {e}", ephemeral=True)
                 return
+            
+            RULES = r"""
+                ROLE: Senior tech recruiter (20+ yrs) hiring SWE/SDE/Data interns. ATS-savvy (Workday, Greenhouse, Lever, Taleo, iCIMS).
+                GOAL: Tailor the resume to the JD with maximal relevance.
 
-            # 4) Build prompt & generate PDF
-            prompt = f"""
-                You are a **Senior Technical Recruiter (20+ yrs)** experienced in hiring **Software Engineers** at top tech firms.
-                You are an expert at using **ATS (Workday, Lever, Greenhouse, Taleo, iCIMS)** to evaluate resumes for 
-                **SWE Interns, SDE Intern, Data/Systems interns, etc** roles.
+                OUTPUT FORMAT (CRITICAL):
+                - Return ONLY valid, compilable LaTeX starting with \documentclass
+                - NO markdown code fences (no ```latex or ```)
+                - NO explanatory text before or after the LaTeX
+                - NO comments about changes made
+                - Must include \begin{document} and \end{document}
 
-                ---
-
-                ### Task
-                Analyze the following job description and candidate resume, then **tailor the resume** to align with the most relevant
-                responsibilities and keywords from the description.
-
-                ### Guidelines
-                - Focus on **data structures, algorithms, debugging, scalability, APIs, CI/CD, distributed systems, and ownership**.
-                - Use **action verbs + quantifiable impact** (e.g., “Improved system efficiency by 20%”).
-                - Highlight collaboration, problem-solving, and scalability experience.
-                - **Do NOT add or infer** any new tech stacks, frameworks, or tools not already listed.
-                - Maintain **factual accuracy** and preserve all **LaTeX structure/macros**.
-                - **Output only valid LaTeX** that compiles. Do NOT include markdown, analysis, explanations, or code fences.
-
-                ---
-
-                **Job Description:**  
-                {job_description}
-
-                **Candidate Resume (plain text):**  
-                {text}
-
-                Use this LaTeX template for formatting consistency:  
-                {resumeFormats.alex_format}
+                CONSTRAINTS:
+                1) One page max. 
+                2) Preserve ALL macros/structure from TEMPLATE. 
+                3) No new tools/frameworks; stay factual.
+                4) Bullets: action-verb, Google XYZ format (Accomplished X by doing Y resulting in Z)
+                5) Optimize ATS keywords from JD (repeat key terms naturally)
+                6) May reorder/reword for relevance; remove redundancy; prefer measurable impact.
+                7) Do NOT change packages/geometry/fonts or add \usepackage lines.
+                8) Escape LaTeX special chars: & % $ # _ { } ~ ^ \
+                9) No extra whitespace at file start/end; no stray % lines; balanced braces.
+                10) If space is tight, compress phrasing before dropping content; keep education + top skills.
                 """
+
+            prompt = f"""\
+            {RULES}
+
+            ========== TEMPLATE (PRESERVE STRUCTURE) ==========
+            {resumeFormats.alex_format}
+
+            ========== JOB DESCRIPTION (SOURCE KEYWORDS) ==========
+            {application_link}
+
+            ========== CURRENT RESUME (SOURCE CONTENT) ==========
+            {text}
+
+            ========== TASK ==========
+            Generate ONE complete LaTeX document that:
+            - Uses the TEMPLATE structure exactly
+            - Incorporates content from RESUME
+            - Optimizes for keywords in JOB DESCRIPTION
+            - Follows all CONSTRAINTS above
+
+            OUTPUT ONLY THE LATEX CODE. START WITH \\documentclass.
+            """
             try:
-                # Run the blocking LaTeX call in a background thread
+                t2 = time.monotonic()
+
                 pdf_path = await asyncio.to_thread(ParseData.parseResume, prompt)
+                t3 = time.monotonic()
+                print(f"[TIMER] parseResume (OpenAI + LaTeX): {t3 - t2:.2f}s")
                 print(f"DEBUG: parseResume returned: {pdf_path}")
+                total_time = time.monotonic() - start_total
+                print(f"[TIMER] Total command runtime: {total_time:.2f}s")
                 with open(pdf_path, "rb") as f:
                     await interaction.followup.send(
                         content="Here’s your tailored resume!",
@@ -106,6 +126,8 @@ class TailorResume:
                     )
                         
             except Exception as e:
-                await interaction.followup.send(f"Error generating tailored resume: {e}", ephemeral=True)
-                
+                await interaction.followup.send(
+                content="Error: LaTeX failed to compile. Debug files saved locally.",
+                ephemeral=True
+            )
                 
