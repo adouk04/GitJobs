@@ -5,6 +5,9 @@ import discord
 import resumeFormats
 import asyncio
 import time
+import os
+
+GUILD_ID = int(os.getenv("DISCORD_SERVER_ID"))
 
 class TailorResume:
     def __init__(self, tree: app_commands.CommandTree):
@@ -30,7 +33,10 @@ class TailorResume:
         
 
     def _register(self):
-        @self.tree.command(name="tailor_resume", description="tailors resume for user")
+        @self.tree.command(name="tailor_resume", 
+                           description="tailors resume for user",
+                           guild=discord.Object(id=GUILD_ID)
+        )
         async def tailor_resume(interaction: Interaction, file: Attachment, application_link: str):
 
             if not file.filename.lower().endswith(".pdf"):

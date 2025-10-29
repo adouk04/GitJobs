@@ -43,16 +43,14 @@ tree = app_commands.CommandTree(client)
 async def on_ready():
     print(f"Logged in as {client.user} ({client.user.id})")
 
+    TailorResume(tree)
 
     guild = discord.Object(id=int(DISCORD_SERVER_ID))
     # Register commands BEFORE on_ready (safe & clear)
-    TailorResume(tree)
-    try:
-        await tree.sync(guild=guild)
-        log.info("Slash commands synced to guild.")
-    except Exception as e:
-        log.exception("Slash command sync failed")
-        
+
+    await tree.sync(guild=guild)
+    log.info("Slash commands synced to guild.")
+
     # Send a boot message to a specific channel
     channel = client.get_channel(DISCORD_CHANNEL_TOKEN) or await client.fetch_channel(DISCORD_CHANNEL_TOKEN)
     if channel:
