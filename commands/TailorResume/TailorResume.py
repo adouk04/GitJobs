@@ -43,8 +43,10 @@ class TailorResume:
                 return
 
             await interaction.response.defer(ephemeral=True, thinking=True)
-            
+            start_total = time.monotonic()
+
             await interaction.followup.send(f"Received `{file.filename}`. Extracting text…", ephemeral=True)
+            t0 = time.monotonic()
 
             text = ""
             try:
