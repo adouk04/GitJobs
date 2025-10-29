@@ -26,12 +26,11 @@ class TailorResume:
             text = re.sub(r'\n{3,}', '\n\n', text).strip()
             return text
         except Exception:
-            # Graceful fallback expected by your tests
             return ""
         
 
     def _register(self):
-        @self.tree.command(name="tailor_resume", description="tailors resume for user")
+        @self.tree.command(name="tailor_resume", description="Input a job link or job description to receive a tailored resume")
         async def tailor_resume(interaction: Interaction, file: Attachment, application_link: str):
 
             if not file.filename.lower().endswith(".pdf"):
@@ -52,6 +51,10 @@ class TailorResume:
             try:
                 pdf_bytes = await file.read()
                 text = TailorResume.extract_text_pdf(pdf_bytes)
+
+                t1 = time.monotonic()
+                print(f"[TIMER] PDF extraction: {t1 - t0:.2f}s")
+
                 if not text.strip():
                     await interaction.followup.send(
                         "I couldn’t extract any text—this PDF may be image-only. Try an OCR’d PDF.",
@@ -65,30 +68,31 @@ class TailorResume:
             except Exception as e:
                 await interaction.followup.send(f"Failed to parse the PDF: {e}", ephemeral=True)
                 return
-            
+
             RULES = r"""
-                ROLE: Senior tech recruiter (20+ yrs) hiring SWE/SDE/Data interns. ATS-savvy (Workday, Greenhouse, Lever, Taleo, iCIMS).
-                GOAL: Tailor the resume to the JD with maximal relevance.
+            ROLE: Senior tech recruiter (20+ yrs) hiring SWE/SDE/Data interns. ATS-savvy (Workday, Greenhouse, Lever, Taleo, iCIMS).
+            GOAL: Tailor the resume to the JD with maximal relevance.
 
-                OUTPUT FORMAT (CRITICAL):
-                - Return ONLY valid, compilable LaTeX starting with \documentclass
-                - NO markdown code fences (no ```latex or ```)
-                - NO explanatory text before or after the LaTeX
-                - NO comments about changes made
-                - Must include \begin{document} and \end{document}
+            OUTPUT FORMAT (CRITICAL):
+            - Return ONLY valid, compilable LaTeX starting with \documentclass
+            - NO markdown code fences (no ```latex or ```)
+            - NO explanatory text before or after the LaTeX
+            - NO comments about changes made
+            - Must include \begin{document} and \end{document}
 
-                CONSTRAINTS:
-                1) One page max. 
-                2) Preserve ALL macros/structure from TEMPLATE. 
-                3) No new tools/frameworks; stay factual.
-                4) Bullets: action-verb, Google XYZ format (Accomplished X by doing Y resulting in Z)
-                5) Optimize ATS keywords from JD (repeat key terms naturally)
-                6) May reorder/reword for relevance; remove redundancy; prefer measurable impact.
-                7) Do NOT change packages/geometry/fonts or add \usepackage lines.
-                8) Escape LaTeX special chars: & % $ # _ { } ~ ^ \
-                9) No extra whitespace at file start/end; no stray % lines; balanced braces.
-                10) If space is tight, compress phrasing before dropping content; keep education + top skills.
-                """
+            CONSTRAINTS:
+            1) One page max. 
+            2) Preserve ALL macros/structure from TEMPLATE. 
+            3) No new tools/frameworks; stay factual.
+            4) Bullets: action-verb, Google XYZ format (Accomplished X by doing Y resulting in Z)
+            5) Optimize ATS keywords from JD (repeat key terms naturally)
+            6) May reorder/reword for relevance; remove redundancy; prefer measurable impact.
+            7) Do NOT change packages/geometry/fonts or add \usepackage lines.
+            8) Escape LaTeX special chars: & % $ # _ { } ~ ^ \
+            9) No extra whitespace at file start/end; no stray % lines; balanced braces.
+            10) If space is tight, compress phrasing before dropping content; keep education + top skills.
+            """
+
 
             prompt = f"""\
             {RULES}
@@ -132,4 +136,3 @@ class TailorResume:
                 content="Error: LaTeX failed to compile. Debug files saved locally.",
                 ephemeral=True
             )
-                

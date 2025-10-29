@@ -35,38 +35,41 @@ DISCORD_SERVER_ID = os.getenv("DISCORD_SERVER_ID")
 if not DISCORD_SERVER_ID:
     raise ValueError("Missing DISCORD_SERVER_ID in .env, raise in main")
 
-intents = discord.Intents(guilds=True) 
+intents = discord.Intents.default()
 client = discord.Client(intents=intents)
 tree = app_commands.CommandTree(client)
 
+# Register commands BEFORE on_ready (safe & clear)
 TailorResume(tree)
 
 @client.event
 async def on_ready():
     print(f"Logged in as {client.user} ({client.user.id})")
-    log.info(f"Logged in as {client.user} ({client.user.id})")
 
-    # Sync commands to the single guild (instant availability)
     try:
-        await tree.sync(guild=discord.Object(id=DISCORD_SERVER_ID))
-        log.info(f"Synchronized app commands to guild {DISCORD_SERVER_ID}")
+        guild = discord.Object(id=DISCORD_SERVER_ID)
+
+        # If your commands are defined without guild=..., they are "global".
+        # Copy them to the guild for INSTANT availability:
+        tree.copy_global_to(guild=guild)
+
+        # Sync to the guild (fast). This registers/updates guild-scoped versions.
+        await tree.sync(guild=guild)
+
+        # Optional: also sync globals (can take up to ~1 hour to propagate):
+        # await tree.sync()
+
+        print("Slash commands synced to guild.")
     except Exception as e:
-        log.exception("Slash command sync failed: %s", e)
+        print(f"[slash sync] {e}")
 
-    # Optional: announce boot in a specific channel
-    channel = client.get_channel(DISCORD_CHANNEL_TOKEN)
-    if channel is None:
-        try:
-            channel = await client.fetch_channel(DISCORD_CHANNEL_TOKEN)
-        except Exception as e:
-            log.warning("fetch_channel failed: %s", e)
-
+    # Send a boot message to a specific channel
+    channel = client.get_channel(DISCORD_CHANNEL_TOKEN) or await client.fetch_channel(DISCORD_CHANNEL_TOKEN)
     if channel:
         try:
             await channel.send("Bot is now online")
         except Exception as e:
-            log.warning("Failed to send startup message: %s", e)
+            print(f"[send] {e}")
     else:
-        log.warning("Channel not found; check DISCORD_CHANNEL and permissions")
-
+        print("[warn] Channel not found; check DISCORD_CHANNEL_ID and bot permissions")
 client.run(DISCORD_BOT_TOKEN)

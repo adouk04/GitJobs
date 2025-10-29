@@ -67,7 +67,6 @@ class ParseData:
 
         try:
             client = OpenAI()
-
             t_api_start = time.monotonic()
 
             response = client.chat.completions.create(
@@ -94,6 +93,9 @@ class ParseData:
 
 
         latex_content = ParseData._strip_code_fences(response.choices[0].message.content or "")
+        latex_content = re.sub(r'(\\item(?:\[[^\]]*\])?\s*\n)\s*\n+', r'\1', latex_content)  
+        latex_content = re.sub(r'\\end{itemize}\s*\n\s*\n+', r'\\end{itemize}\n', latex_content)  
+        latex_content = re.sub(r'\n{3,}', '\n\n', latex_content)
         if not (r"\begin{document}" in latex_content or r"\documentclass" in latex_content):
             logging.warning("Model returned fragment; wrapping into minimal LaTeX document.")
             latex_content = (
@@ -108,7 +110,7 @@ class ParseData:
         if not pdflatex_path:
             raise Exception("Could not find pdflatex executable. Please ensure LaTeX is installed.")
         
-        LATEX_TIMEOUT = int(os.getenv("LATEX_TIMEOUT_SEC", "300"))  # per-run timeout (sec)
+        LATEX_TIMEOUT = int(os.getenv("LATEX_TIMEOUT_SEC", "300")) 
 
         # Compile LaTeX
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -133,7 +135,6 @@ class ParseData:
                             bang = [ln for ln in lines if ln.lstrip().startswith("!")]
                             excerpt = "".join(bang[:20]) or "".join(lines[-80:])
                         preview = (latex_content[:1000]).replace("\n", "\\n")
-                        # try to persist debug
                         try:
                             ts = int(time.time())
                             failed_tex = os.path.abspath(f"failed_resume_{ts}.tex")
