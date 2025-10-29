@@ -39,15 +39,14 @@ intents = discord.Intents.default()
 client = discord.Client(intents=intents)
 tree = app_commands.CommandTree(client)
 
-# Register commands BEFORE on_ready (safe & clear)
-TailorResume(tree)
-
 @client.event
 async def on_ready():
     print(f"Logged in as {client.user} ({client.user.id})")
 
 
     guild = discord.Object(id=int(DISCORD_SERVER_ID))
+    # Register commands BEFORE on_ready (safe & clear)
+    TailorResume(tree)
     try:
         await tree.sync(guild=guild)
         log.info("Slash commands synced to guild.")
