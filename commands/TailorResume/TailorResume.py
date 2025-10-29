@@ -30,7 +30,7 @@ class TailorResume:
         
 
     def _register(self):
-        @self.tree.command(name="tailor_my_resume", description="Input a job link or job description to receive a tailored resume")
+        @self.tree.command(name="tailor_resume", description="tailors resume for user")
         async def tailor_resume(interaction: Interaction, file: Attachment, application_link: str):
 
             if not file.filename.lower().endswith(".pdf"):
