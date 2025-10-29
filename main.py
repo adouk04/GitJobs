@@ -46,23 +46,14 @@ TailorResume(tree)
 async def on_ready():
     print(f"Logged in as {client.user} ({client.user.id})")
 
+
+    guild = discord.Object(id=int(DISCORD_SERVER_ID))
     try:
-        guild = discord.Object(id=DISCORD_SERVER_ID)
-
-        # If your commands are defined without guild=..., they are "global".
-        # Copy them to the guild for INSTANT availability:
-        tree.copy_global_to(guild=guild)
-
-        # Sync to the guild (fast). This registers/updates guild-scoped versions.
         await tree.sync(guild=guild)
-
-        # Optional: also sync globals (can take up to ~1 hour to propagate):
-        # await tree.sync()
-
-        print("Slash commands synced to guild.")
+        log.info("Slash commands synced to guild.")
     except Exception as e:
-        print(f"[slash sync] {e}")
-
+        log.exception("Slash command sync failed")
+        
     # Send a boot message to a specific channel
     channel = client.get_channel(DISCORD_CHANNEL_TOKEN) or await client.fetch_channel(DISCORD_CHANNEL_TOKEN)
     if channel:
