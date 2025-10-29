@@ -1,7 +1,6 @@
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from dotenv import load_dotenv
 from commands.TailorResume.TailorResume import TailorResume
-from http.server import BaseHTTPRequestHandler, HTTPServer
 import logging, discord, threading, os
 from discord import app_commands
 
@@ -27,11 +26,11 @@ DISCORD_BOT_TOKEN = os.getenv("DISCORD_BOT_TOKEN")
 if not DISCORD_BOT_TOKEN:
     raise ValueError("Missing DISCORD_BOT_TOKEN in .env, raised in main file")
 
-DISCORD_CHANNEL_TOKEN = os.getenv("DISCORD_CHANNEL")
+DISCORD_CHANNEL_TOKEN = int(os.getenv("DISCORD_CHANNEL"))
 if not DISCORD_CHANNEL_TOKEN:
     raise ValueError("Missing DISCORD_CHANNEL_TOKEN in .env, raise in main")
 
-DISCORD_SERVER_ID = os.getenv("DISCORD_SERVER_ID")
+DISCORD_SERVER_ID = int(os.getenv("DISCORD_SERVER_ID"))
 if not DISCORD_SERVER_ID:
     raise ValueError("Missing DISCORD_SERVER_ID in .env, raise in main")
 
@@ -43,21 +42,25 @@ tree = app_commands.CommandTree(client)
 async def on_ready():
     print(f"Logged in as {client.user} ({client.user.id})")
 
+    guild = discord.Object(id=DISCORD_SERVER_ID)
+    # Register commands BEFORE on_ready (safe & clear)
+    tree.clear_commands(guild=None)          # clear local globals
+    await tree.sync()
+    
+    tree.clear_commands(guild=guild)  # clear guild-specific
+    
+    await tree.sync(guild=guild)
     TailorResume(tree)
 
-    guild = discord.Object(id=int(DISCORD_SERVER_ID))
-    # Register commands BEFORE on_ready (safe & clear)
-
     await tree.sync(guild=guild)
+
     log.info("Slash commands synced to guild.")
 
     # Send a boot message to a specific channel
-    channel = client.get_channel(DISCORD_CHANNEL_TOKEN) or await client.fetch_channel(DISCORD_CHANNEL_TOKEN)
-    if channel:
-        try:
-            await channel.send("Bot is now online")
-        except Exception as e:
-            print(f"[send] {e}")
-    else:
-        print("[warn] Channel not found; check DISCORD_CHANNEL_ID and bot permissions")
+    try:
+        ch = client.get_channel(DISCORD_CHANNEL_TOKEN) or await client.fetch_channel(DISCORD_CHANNEL_TOKEN)
+        await ch.send("Bot is now online (scoped to this server/channel).")
+    except Exception as e:
+        log.warning(f"Boot message failed: {e}")
+        
 client.run(DISCORD_BOT_TOKEN)
