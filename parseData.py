@@ -95,7 +95,7 @@ class ParseData:
 
 
         latex_content = ParseData._strip_code_fences(response.choices[0].message.content or "")
-        if not ("\begin{document}" in latex_content or "\documentclass" in latex_content):
+        if not (r"\begin{document}" in latex_content or r"\documentclass" in latex_content):
             logging.warning("Model returned fragment; wrapping into minimal LaTeX document.")
             latex_content = (
                 "\\documentclass{article}\n"
@@ -156,7 +156,7 @@ class ParseData:
                 output_filename = "Tailored_Resume.pdf"
                 with open(pdf_src, "rb") as src, open(output_filename, "wb") as dst:
                     dst.write(src.read())
-                return output_filename  # <-- single string, NOT a tuple
+                return output_filename 
 
             except subprocess.TimeoutExpired:
                 raise Exception("LaTeX compilation timed out. Consider increasing LATEX_TIMEOUT_SEC.")
