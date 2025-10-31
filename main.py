@@ -34,33 +34,37 @@ DISCORD_SERVER_ID = int(os.getenv("DISCORD_SERVER_ID"))
 if not DISCORD_SERVER_ID:
     raise ValueError("Missing DISCORD_SERVER_ID in .env, raise in main")
 
-intents = discord.Intents.default()
+intents = discord.Intents(guilds=True)
 client = discord.Client(intents=intents)
 tree = app_commands.CommandTree(client)
+
+TailorResume(tree)
 
 @client.event
 async def on_ready():
     print(f"Logged in as {client.user} ({client.user.id})")
-
-    guild = discord.Object(id=DISCORD_SERVER_ID)
-    # Register commands BEFORE on_ready (safe & clear)
-    tree.clear_commands(guild=None)          # clear local globals
-    await tree.sync()
-    
-    tree.clear_commands(guild=guild)  # clear guild-specific
-    
-    await tree.sync(guild=guild)
-    TailorResume(tree)
-
-    await tree.sync(guild=guild)
+    log.info(f"Logged in as {client.user} ({client.user.id})")
+    try:
+        await tree.sync(guild=discord.Object(id=DISCORD_SERVER_ID))
+        log.info(f"Synchronized app commands to guild {DISCORD_SERVER_ID}")
+    except Exception as e:
+        log.exception("Slash commands sync failed: %s", e)
 
     log.info("Slash commands synced to guild.")
 
-    # Send a boot message to a specific channel
-    try:
-        ch = client.get_channel(DISCORD_CHANNEL_TOKEN) or await client.fetch_channel(DISCORD_CHANNEL_TOKEN)
-        await ch.send("Bot is now online (scoped to this server/channel).")
-    except Exception as e:
-        log.warning(f"Boot message failed: {e}")
+    channel = client.get_channel(DISCORD_CHANNEL_TOKEN)
+    if channel is None:
+        try:
+            channel = await client.fetch_channel(DISCORD_CHANNEL_TOKEN)
+        except Exception as e:
+            log.warning("fetch_channel failed: %s", e)
+    
+    if channel:
+        try:
+            await channel.send("Bot is now online")
+        except Exception as e:
+            log.warning("Failed to send startup message: %s", e)
+    else:
+        log.warning("Channel not found; check DISCORD_CHANNEL and permissions")
         
 client.run(DISCORD_BOT_TOKEN)
