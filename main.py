@@ -45,19 +45,16 @@ async def on_ready():
     print(f"Logged in as {client.user} ({client.user.id})")
     log.info(f"Logged in as {client.user} ({client.user.id})")
     try:
-        await tree.sync(guild=discord.Object(id=DISCORD_SERVER_ID))
-        log.info(f"Synchronized app commands to guild {DISCORD_SERVER_ID}")
+        guild = discord.Object(id=DISCORD_SERVER_ID)
+        tree.copy_global_to(guild=guild)
+        await tree.sync()
+        log.info("Slash commands synced to guild.")
+
     except Exception as e:
         log.exception("Slash commands sync failed: %s", e)
 
-    log.info("Slash commands synced to guild.")
 
-    channel = client.get_channel(DISCORD_CHANNEL_TOKEN)
-    if channel is None:
-        try:
-            channel = await client.fetch_channel(DISCORD_CHANNEL_TOKEN)
-        except Exception as e:
-            log.warning("fetch_channel failed: %s", e)
+    channel = client.get_channel(DISCORD_CHANNEL_TOKEN) or await client.fetch_channel(DISCORD_CHANNEL_TOKEN)
     
     if channel:
         try:
